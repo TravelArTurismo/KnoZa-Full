@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KnoZa - Sistema de Control</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Section -->
+    <div id="login-container" class="container">
+        <div class="login-box">
+            <div class="logo">
+                <h1>Kno<span>Za</span></h1>
+            </div>
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="employee-id">Número de Empleado</label>
+                    <input type="text" id="employee-id" placeholder="Ingrese su N° de empleado" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Contraseña</label>
+                    <input type="password" id="password" placeholder="Ingrese su contraseña" required>
+                </div>
+                <button type="submit" class="btn-login">Ingresar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="hidden">
+        <header>
+            <div class="header-left">
+                <h1>Kno<span>Za</span></h1>
+            </div>
+            <div class="header-right">
+                <span id="welcome-message"></span>
+                <button id="logout-btn" class="btn-logout"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </header>
+
+        <main>
+            <!-- Options Menu -->
+            <div class="options-container">
+                <div class="option-card" id="entry-exit-option">
+                    <i class="fas fa-clock"></i>
+                    <h3>Entrada - Salida</h3>
+                </div>
+                <div class="option-card" id="break-option">
+                    <i class="fas fa-coffee"></i>
+                    <h3>Descanso</h3>
+                </div>
+                <div class="option-card" id="price-option">
+                    <i class="fas fa-calculator"></i>
+                    <h3>Simular Precio</h3>
+                </div>
+            </div>
+
+            <!-- Entry-Exit Section -->
+            <div id="entry-exit-section" class="content-section hidden">
+                <h2><i class="fas fa-clock"></i> Control de Entrada/Salida</h2>
+                <div class="controls">
+                    <button id="register-entry" class="btn-action">Registrar Entrada</button>
+                    <button id="register-exit" class="btn-action">Registrar Salida</button>
+                </div>
+                
+                <!-- Admin History Table -->
+                <div id="entry-exit-history" class="hidden">
+                    <div class="table-header">
+                        <h3>Historial</h3>
+                        <div class="search-container">
+                            <input type="text" id="entry-exit-search" placeholder="Buscar empleado...">
+                            <button id="copy-entry-exit" class="btn-copy">Copiar a Excel</button>
+                        </div>
+                    </div>
+                    <table id="entry-exit-table">
+                        <thead>
+                            <tr>
+                                <th>N° Empleado</th>
+                                <th>Fecha</th>
+                                <th>Hora Entrada</th>
+                                <th>Hora Salida</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entry-exit-table-body">
+                            <!-- JS populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Break Section -->
+            <div id="break-section" class="content-section hidden">
+                <h2><i class="fas fa-coffee"></i> Control de Descansos</h2>
+                <div class="break-controls">
+                    <div class="break-options">
+                        <h3>Duración:</h3>
+                        <div class="break-buttons">
+                            <button class="btn-break-option" data-minutes="10">10 min</button>
+                            <button class="btn-break-option" data-minutes="15">15 min</button>
+                            <button class="btn-break-option" data-minutes="20">20 min</button>
+                        </div>
+                        <div class="break-type">
+                            <input type="text" id="break-type" readonly>
+                        </div>
+                    </div>
+                    <div class="break-timer">
+                        <div id="timer-display">00:00</div>
+                        <div class="break-actions">
+                            <button id="start-break" class="btn-action">Iniciar Descanso</button>
+                            <button id="end-break" class="btn-action" disabled>Finalizar Descanso</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Admin Break History -->
+                <div id="break-history" class="hidden">
+                    <div class="table-header">
+                        <h3>Historial</h3>
+                        <div class="search-container">
+                            <input type="text" id="break-search" placeholder="Buscar empleado...">
+                            <button id="copy-break" class="btn-copy">Copiar a Excel</button>
+                        </div>
+                    </div>
+                    <table id="break-table">
+                        <thead>
+                            <tr>
+                                <th>N° Empleado</th>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th>Opción</th>
+                                <th>Tiempo</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="break-table-body">
+                            <!-- JS populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Price Simulator Section -->
+            <div id="price-section" class="content-section hidden">
+                <h2><i class="fas fa-calculator"></i> Simulador de Precios</h2>
+                <div class="price-controls">
+                    <div class="price-inputs">
+                        <div class="input-group">
+                            <label for="medicine-name">Nombre Medicamento</label>
+                            <input type="text" id="medicine-name" placeholder="Ej: Ibuprofeno 400mg">
+                        </div>
+                        <div class="input-group">
+                            <label for="gross-price">Precio Bruto</label>
+                            <input type="number" id="gross-price" placeholder="Ej: 5000" step="0.01">
+                        </div>
+                        <div class="input-group">
+                            <label for="coverage">Cobertura (%)</label>
+                            <input type="number" id="coverage" placeholder="Ej: 50" min="0" max="100">
+                        </div>
+                        <button id="calculate-price" class="btn-action">Calcular</button>
+                      <button id="clear-price-table" class="btn-clear">Limpiar Tabla</button>
+                    </div>
+                    
+                    <div class="price-results">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nombre Medicamento</th>
+                                    <th>Precio Bruto</th>
+                                    <th>Cobertura</th>
+                                    <th>Total Final</th>
+                                </tr>
+                            </thead>
+                            <tbody id="price-table-body">
+                                <!-- JS populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="message-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <p id="modal-message"></p>
+        </div>
+    </div>
+  
+  <!-- Modal de Confirmación -->
+<div id="confirm-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 400px;">
+        <p id="confirm-message" style="margin-bottom: 20px;">¿Está seguro de eliminar este registro?</p>
+        <div style="display: flex; justify-content: center; gap: 20px;">
+            <button id="confirm-yes" class="btn-action" style="background-color: #dc3545;">Sí</button>
+            <button id="confirm-no" class="btn-action" style="background-color: #28a745;">No</button>
+        </div>
+    </div>
+</div>
+
+    <script src="script.js"></script>
+</body>
+</html>
