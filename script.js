@@ -197,7 +197,7 @@ async function registerEntry() {
 
     try {
         // Verificar si ya tiene una entrada sin salida
-        const existingRecords = await fetchData(`/entry-exit?employee_id=${currentUser.id}&date=${record.date}`);
+const existingRecords = await fetchData(`/entry-exit?employee_id=${currentUser.id}&date=${record.date}`);
         const hasOpenEntry = existingRecords.some(r => r.exit_time === null);
 
         if (hasOpenEntry) {
