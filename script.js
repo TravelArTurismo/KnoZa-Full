@@ -2,9 +2,9 @@
 // CONFIGURACIÓN BASE - URLs dinámicas
 // ==============================================
 const IS_DEVELOPMENT = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_BASE_URL = IS_DEVELOPMENT 
-  ? 'http://localhost:3001/api' 
-  : 'https://knoza.onrender.com/api';
+const API_BASE_URL = window.location.hostname === 'knoza.onrender.com' 
+  ? 'https://knoza.onrender.com/api' 
+  : 'http://localhost:3001/api';
 
 const FETCH_OPTIONS = {
   credentials: 'include',
@@ -89,23 +89,29 @@ let currentDeleteFunction = null;
 // FUNCIONES PRINCIPALES
 // ==============================================
 
-// Función mejorada para hacer fetch
 async function fetchData(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
-    const mergedOptions = { ...FETCH_OPTIONS, ...options };
+    console.log('Sending request to:', url); // ← Esto aparecerá en la consola del navegador
     
     try {
-        const response = await fetch(url, mergedOptions);
-        
+        const response = await fetch(url, {
+            ...FETCH_OPTIONS,
+            ...options
+        });
+
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Error ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
         
         return await response.json();
     } catch (error) {
-        console.error('Error en la conexión:', error);
-        showMessage(error.message || 'Error de conexión con el servidor');
+        console.error('Full error details:', {
+            url,
+            error: error.message,
+            stack: error.stack
+        });
+        showMessage(`Error al conectar: ${error.message}`);
         throw error;
     }
 }
