@@ -5,18 +5,20 @@ const cors = require('cors');
 
 const app = express();
 
-// Configuración de CORS para producción y desarrollo
+// Configuración de CORS mejorada
 const corsOptions = {
   origin: [
     'https://knoza.onrender.com',
-    'http://localhost:3001'
+    'http://localhost:3001',
+    'http://localhost:5500' // Añade esto para desarrollo local con Live Server
   ],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'], // Especifica métodos permitidos
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Conexión a PostgreSQL
+// Conexión a PostgreSQL (esto está correcto)
 const db = new Pool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -33,7 +35,9 @@ db.connect()
   .then(() => console.log('✅ Conectado a PostgreSQL'))
   .catch(err => console.error('❌ Error de conexión:', err));
 
-// Rutas de la API
+// ==============================================
+// RUTAS PARA ENTRADAS/SALIDAS (ESTAS ESTÁN CORRECTAS)
+// ==============================================
 app.post('/api/entry-exit', async (req, res) => {
   const { employee_id, date, entry_time, exit_time, timestamp } = req.body;
   try {
@@ -45,7 +49,10 @@ app.post('/api/entry-exit', async (req, res) => {
     res.json({ success: true, message: 'Registro guardado' });
   } catch (err) {
     console.error('Error al guardar entrada/salida:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
+    res.status(500).json({ 
+      error: 'Error en el servidor',
+      details: err.message // Añade más detalles del error
+    });
   }
 });
 
@@ -62,7 +69,10 @@ app.patch('/api/entry-exit/:id', async (req, res) => {
     res.json({ success: true, message: 'Salida registrada' });
   } catch (err) {
     console.error('Error al actualizar salida:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
+    res.status(500).json({ 
+      error: 'Error en el servidor',
+      details: err.message
+    });
   }
 });
 
@@ -82,11 +92,16 @@ app.get('/api/entry-exit', async (req, res) => {
     res.json(results.rows);
   } catch (err) {
     console.error('Error al leer registros:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
+    res.status(500).json({ 
+      error: 'Error en el servidor',
+      details: err.message
+    });
   }
 });
 
-// Rutas para descansos (similar a las anteriores)
+// ==============================================
+// RUTAS PARA DESCANSO - AÑADÍ LAS QUE FALTABAN
+// ==============================================
 app.post('/api/breaks', async (req, res) => {
   const { employee_id, date, break_type, duration, timestamp } = req.body;
   try {
@@ -98,7 +113,54 @@ app.post('/api/breaks', async (req, res) => {
     res.json({ success: true, message: 'Descanso registrado' });
   } catch (err) {
     console.error('Error al guardar descanso:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
+    res.status(500).json({ 
+      error: 'Error en el servidor',
+      details: err.message
+    });
+  }
+});
+
+// AÑADE ESTA NUEVA RUTA GET PARA BREAKS
+app.get('/api/breaks', async (req, res) => {
+  const { employee_id, date } = req.query;
+  let query = 'SELECT * FROM breaks';
+  let params = [];
+
+  if (employee_id && date) {
+    query += ' WHERE employee_id = $1 AND date = $2';
+    params = [employee_id, date];
+  }
+  query += ' ORDER BY date DESC, timestamp DESC';
+
+  try {
+    const results = await db.query(query, params);
+    res.json(results.rows);
+  } catch (err) {
+    console.error('Error al leer descansos:', err);
+    res.status(500).json({ 
+      error: 'Error en el servidor',
+      details: err.message
+    });
+  }
+});
+
+// AÑADE ESTA NUEVA RUTA DELETE PARA BREAKS
+app.delete('/api/breaks/:id', async (req, res) => {
+  try {
+    const result = await db.query(
+      'DELETE FROM breaks WHERE id = $1',
+      [req.params.id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Registro no encontrado' });
+    }
+    res.json({ success: true, message: 'Descanso eliminado' });
+  } catch (err) {
+    console.error('Error al eliminar descanso:', err);
+    res.status(500).json({ 
+      error: 'Error en el servidor',
+      details: err.message
+    });
   }
 });
 
@@ -106,4 +168,11 @@ app.post('/api/breaks', async (req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Servidor activo en http://localhost:${PORT}`);
+  console.log(`Rutas disponibles:`);
+  console.log(`- POST /api/entry-exit`);
+  console.log(`- PATCH /api/entry-exit/:id`);
+  console.log(`- GET /api/entry-exit`);
+  console.log(`- POST /api/breaks`);
+  console.log(`- GET /api/breaks`);
+  console.log(`- DELETE /api/breaks/:id`);
 });
