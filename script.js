@@ -1,4 +1,15 @@
-// Datos de usuarios válidos (se mantienen igual)
+// ==============================================
+// CONFIGURACIÓN BASE - URLs y opciones de fetch
+// ==============================================
+const API_BASE_URL = 'https://knoza.onrender.com/api';
+const FETCH_OPTIONS = {
+  credentials: 'include',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+};
+
+// Datos de usuarios válidos
 const users = [
     { id: "234", password: "1244", name: "Nicolas", lastName: "Canosa", isAdmin: false },
     { id: "239", password: "1234", name: "Ayrton", lastName: "Roldan", isAdmin: false },
@@ -6,14 +17,14 @@ const users = [
     { id: "ADMIN", password: "1244", name: "Administrador", lastName: "", isAdmin: true }
 ];
 
-// Variables globales (se mantienen igual)
+// Variables globales
 let currentUser = null;
 let breakInterval = null;
 let breakStartTime = null;
 let selectedBreakMinutes = 0;
 let breakActive = false;
 
-// Elementos del DOM (se mantienen igual)
+// Elementos del DOM
 const loginContainer = document.getElementById('login-container');
 const dashboard = document.getElementById('dashboard');
 const loginForm = document.getElementById('login-form');
@@ -71,36 +82,112 @@ let currentRecordToDelete = null;
 let currentDeleteFunction = null;
 
 // ==============================================
-// FUNCIONES MODIFICADAS PARA USAR EL BACKEND API
+// FUNCIONES PRINCIPALES
 // ==============================================
 
-// Función para hacer fetch con manejo de errores
-async function fetchData(url, options = {}) {
+// Función mejorada para hacer fetch
+async function fetchData(endpoint, options = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const mergedOptions = { ...FETCH_OPTIONS, ...options };
+    
     try {
-        const response = await fetch(url, options);
-        if (!response.ok) throw new Error(`Error ${response.status}`);
+        const response = await fetch(url, mergedOptions);
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Error ${response.status}`);
+        }
+        
         return await response.json();
     } catch (error) {
-        console.error('Fetch error:', error);
-        showMessage('Error de conexión con el servidor');
+        console.error('Error en la conexión:', error);
+        showMessage(error.message || 'Error de conexión con el servidor');
         throw error;
     }
 }
 
-// Registro de entrada
+// Manejo de login
+function handleLogin(e) {
+    e.preventDefault();
+    const employeeId = employeeIdInput.value.trim();
+    const password = passwordInput.value.trim();
+    const user = users.find(u => u.id === employeeId && u.password === password);
+    
+    if (user) {
+        currentUser = user;
+        showDashboard();
+    } else {
+        showMessage('Credenciales incorrectas');
+    }
+}
+
+// Manejo de logout
+function handleLogout() {
+    currentUser = null;
+    showLogin();
+    resetBreakControls();
+}
+
+// Mostrar dashboard
+function showDashboard() {
+    loginContainer.classList.add('hidden');
+    dashboard.classList.remove('hidden');
+    welcomeMessage.textContent = `Bienvenido, ${currentUser.name}${currentUser.isAdmin ? ' (Admin)' : ''}`;
+    
+    // Mostrar/ocultar secciones de admin
+    entryExitHistory.classList.toggle('hidden', !currentUser.isAdmin);
+    breakHistory.classList.toggle('hidden', !currentUser.isAdmin);
+    
+    showSection('entry-exit');
+}
+
+// Mostrar login
+function showLogin() {
+    loginContainer.classList.remove('hidden');
+    dashboard.classList.add('hidden');
+    loginForm.reset();
+}
+
+// Mostrar sección específica
+function showSection(section) {
+    entryExitSection.classList.add('hidden');
+    breakSection.classList.add('hidden');
+    priceSection.classList.add('hidden');
+
+    switch(section) {
+        case 'entry-exit':
+            entryExitSection.classList.remove('hidden');
+            if (currentUser.isAdmin) renderEntryExitTable();
+            break;
+        case 'break':
+            breakSection.classList.remove('hidden');
+            updateBreakType();
+            if (currentUser.isAdmin) renderBreakTable();
+            break;
+        case 'price':
+            priceSection.classList.remove('hidden');
+            break;
+    }
+}
+
+// ==============================================
+// FUNCIONES DE ENTRADA/SALIDA
+// ==============================================
+
+// Registrar entrada
 async function registerEntry() {
     const now = new Date();
     const record = {
         employee_id: currentUser.id,
-        date: now.toISOString().split('T')[0], // Formato YYYY-MM-DD
-        entry_time: now.toTimeString().slice(0, 8), // Formato HH:MM:SS
+        date: now.toISOString().split('T')[0],
+        entry_time: now.toTimeString().slice(0, 8),
         exit_time: null,
         timestamp: now.getTime()
     };
 
     try {
         // Verificar si ya tiene una entrada sin salida
-        const existingRecords = await fetchData(`http://localhost:3001/api/entry-exit?employee_id=${currentUser.id}&date=${record.date}`);
+        const existingRecords = await fetchData(`/entry-exit?employee_id=${currentUser.id}&date=${record.date}`);
         const hasOpenEntry = existingRecords.some(r => r.exit_time === null);
 
         if (hasOpenEntry) {
@@ -109,9 +196,8 @@ async function registerEntry() {
         }
 
         // Guardar nueva entrada
-        await fetchData('http://localhost:3001/api/entry-exit', {
+        await fetchData('/entry-exit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(record)
         });
 
@@ -122,7 +208,7 @@ async function registerEntry() {
     }
 }
 
-// Registro de salida
+// Registrar salida
 async function registerExit() {
     const now = new Date();
     const date = now.toISOString().split('T')[0];
@@ -130,7 +216,7 @@ async function registerExit() {
 
     try {
         // Obtener el registro de entrada sin salida
-        const records = await fetchData(`http://localhost:3001/api/entry-exit?employee_id=${currentUser.id}&date=${date}`);
+        const records = await fetchData(`/entry-exit?employee_id=${currentUser.id}&date=${date}`);
         const openEntry = records.find(r => r.exit_time === null);
 
         if (!openEntry) {
@@ -139,9 +225,8 @@ async function registerExit() {
         }
 
         // Actualizar con la hora de salida
-        await fetchData(`http://localhost:3001/api/entry-exit/${openEntry.id}`, {
+        await fetchData(`/entry-exit/${openEntry.id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ exit_time: exitTime })
         });
 
@@ -152,10 +237,10 @@ async function registerExit() {
     }
 }
 
-// Renderizar tabla de entradas/salidas
+// Mostrar tabla de entradas/salidas
 async function renderEntryExitTable() {
     try {
-        const records = await fetchData('http://localhost:3001/api/entry-exit');
+        const records = await fetchData('/entry-exit');
         entryExitTableBody.innerHTML = '';
 
         records.forEach(record => {
@@ -182,7 +267,7 @@ async function renderEntryExitTable() {
     }
 }
 
-// Preparar eliminación de registro de entrada/salida
+// Preparar eliminación de registro
 function prepareDeleteEntryExit(button) {
     if (!currentUser.isAdmin) return;
     
@@ -190,7 +275,7 @@ function prepareDeleteEntryExit(button) {
     
     currentDeleteFunction = async () => {
         try {
-            await fetchData(`http://localhost:3001/api/entry-exit/${recordId}`, {
+            await fetchData(`/entry-exit/${recordId}`, {
                 method: 'DELETE'
             });
             await renderEntryExitTable();
@@ -201,6 +286,17 @@ function prepareDeleteEntryExit(button) {
     };
     
     showDeleteConfirmation();
+}
+
+// ==============================================
+// FUNCIONES DE DESCANSO
+// ==============================================
+
+// Seleccionar duración de descanso
+function selectBreakDuration(e) {
+    selectedBreakMinutes = parseInt(e.target.getAttribute('data-minutes'));
+    breakButtons.forEach(btn => btn.classList.remove('active'));
+    e.target.classList.add('active');
 }
 
 // Iniciar descanso
@@ -218,7 +314,7 @@ async function startBreak() {
     // Verificar límite diario de descansos
     try {
         const today = new Date().toISOString().split('T')[0];
-        const breaks = await fetchData(`http://localhost:3001/api/breaks?employee_id=${currentUser.id}&date=${today}`);
+        const breaks = await fetchData(`/breaks?employee_id=${currentUser.id}&date=${today}`);
         const totalMinutes = breaks.reduce((sum, b) => sum + parseInt(b.duration), 0);
         
         if (totalMinutes >= 30) {
@@ -238,6 +334,20 @@ async function startBreak() {
     breakInterval = setInterval(updateBreakTimer, 1000);
 }
 
+// Actualizar temporizador de descanso
+function updateBreakTimer() {
+    const elapsed = Math.floor((new Date() - breakStartTime) / 1000);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    
+    if (mins >= 25) {
+        endBreak();
+        return;
+    }
+    
+    timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
 // Finalizar descanso
 async function endBreak() {
     if (!breakActive) return;
@@ -254,9 +364,8 @@ async function endBreak() {
     };
 
     try {
-        await fetchData('http://localhost:3001/api/breaks', {
+        await fetchData('/breaks', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(record)
         });
 
@@ -269,10 +378,31 @@ async function endBreak() {
     resetBreakControls();
 }
 
-// Renderizar tabla de descansos
+// Reiniciar controles de descanso
+function resetBreakControls() {
+    clearInterval(breakInterval);
+    timerDisplay.textContent = '00:00';
+    breakActive = false;
+    breakStartTime = null;
+    selectedBreakMinutes = 0;
+    breakButtons.forEach(btn => btn.classList.remove('active'));
+    startBreakBtn.disabled = false;
+    endBreakBtn.disabled = true;
+}
+
+// Actualizar tipo de descanso según hora
+function updateBreakType() {
+    const hours = new Date().getHours();
+    breakTypeInput.value = 
+        hours >= 8 && hours < 12 ? 'Desayuno' :
+        hours >= 12 && hours < 16 ? 'Almuerzo' :
+        hours >= 16 && hours < 20 ? 'Merienda' : 'Fuera de horario';
+}
+
+// Mostrar tabla de descansos
 async function renderBreakTable() {
     try {
-        const breaks = await fetchData('http://localhost:3001/api/breaks');
+        const breaks = await fetchData('/breaks');
         breakTableBody.innerHTML = '';
 
         breaks.forEach(record => {
@@ -313,7 +443,7 @@ function prepareDeleteBreak(button) {
     
     currentDeleteFunction = async () => {
         try {
-            await fetchData(`http://localhost:3001/api/breaks/${breakId}`, {
+            await fetchData(`/breaks/${breakId}`, {
                 method: 'DELETE'
             });
             await renderBreakTable();
@@ -327,167 +457,10 @@ function prepareDeleteBreak(button) {
 }
 
 // ==============================================
-// FUNCIONES QUE SE MANTIENEN IGUAL
+// FUNCIONES DE SIMULADOR DE PRECIOS
 // ==============================================
 
-// Inicialización (se mantiene igual excepto por loadData)
-document.addEventListener('DOMContentLoaded', () => {
-    loginForm.addEventListener('submit', handleLogin);
-    logoutBtn.addEventListener('click', handleLogout);
-    
-    entryExitOption.addEventListener('click', () => showSection('entry-exit'));
-    breakOption.addEventListener('click', () => showSection('break'));
-    priceOption.addEventListener('click', () => showSection('price'));
-    
-    registerEntryBtn.addEventListener('click', registerEntry);
-    registerExitBtn.addEventListener('click', registerExit);
-    entryExitSearch.addEventListener('input', filterEntryExitTable);
-    copyEntryExitBtn.addEventListener('click', () => {
-        if (!currentUser.isAdmin) {
-            showMessage('Acceso restringido: Solo administradores');
-            return;
-        }
-        copyTableToClipboard('entry-exit-table');
-    });
-    
-    startBreakBtn.addEventListener('click', startBreak);
-    endBreakBtn.addEventListener('click', endBreak);
-    breakButtons.forEach(btn => btn.addEventListener('click', selectBreakDuration));
-    breakSearch.addEventListener('input', filterBreakTable);
-    copyBreakBtn.addEventListener('click', () => {
-        if (!currentUser.isAdmin) {
-            showMessage('Acceso restringido: Solo administradores');
-            return;
-        }
-        copyTableToClipboard('break-table');
-    });
-    
-    calculatePriceBtn.addEventListener('click', calculatePrice);
-    clearPriceTableBtn.addEventListener('click', clearPriceTable);
-    
-    // Eventos para modales
-    closeModal.addEventListener('click', closeMessageModal);
-    modal.addEventListener('click', (e) => e.target === modal && closeMessageModal());
-    confirmYes.addEventListener('click', confirmDelete);
-    confirmNo.addEventListener('click', cancelDelete);
-    confirmModal.addEventListener('click', (e) => e.target === confirmModal && cancelDelete());
-});
-
-// Funciones principales que no cambian
-function handleLogin(e) {
-    e.preventDefault();
-    const employeeId = employeeIdInput.value.trim();
-    const password = passwordInput.value.trim();
-    const user = users.find(u => u.id === employeeId && u.password === password);
-    
-    if (user) {
-        currentUser = user;
-        showDashboard();
-    } else {
-        showMessage('Credenciales incorrectas');
-    }
-}
-
-function handleLogout() {
-    currentUser = null;
-    showLogin();
-    resetBreakControls();
-}
-
-function showDashboard() {
-    loginContainer.classList.add('hidden');
-    dashboard.classList.remove('hidden');
-    welcomeMessage.textContent = `Bienvenido, ${currentUser.name}${currentUser.isAdmin ? '' : ''}`;
-    
-    // Mostrar/ocultar secciones de admin
-    entryExitHistory.classList.toggle('hidden', !currentUser.isAdmin);
-    breakHistory.classList.toggle('hidden', !currentUser.isAdmin);
-    
-    showSection('entry-exit');
-}
-
-function showLogin() {
-    loginContainer.classList.remove('hidden');
-    dashboard.classList.add('hidden');
-    loginForm.reset();
-}
-
-function showSection(section) {
-    entryExitSection.classList.add('hidden');
-    breakSection.classList.add('hidden');
-    priceSection.classList.add('hidden');
-
-    switch(section) {
-        case 'entry-exit':
-            entryExitSection.classList.remove('hidden');
-            if (currentUser.isAdmin) renderEntryExitTable();
-            break;
-        case 'break':
-            breakSection.classList.remove('hidden');
-            updateBreakType();
-            if (currentUser.isAdmin) renderBreakTable();
-            break;
-        case 'price':
-            priceSection.classList.remove('hidden');
-            break;
-    }
-}
-
-// Funciones de Descanso que no cambian
-function selectBreakDuration(e) {
-    selectedBreakMinutes = parseInt(e.target.getAttribute('data-minutes'));
-    breakButtons.forEach(btn => btn.classList.remove('active'));
-    e.target.classList.add('active');
-}
-
-function updateBreakTimer() {
-    const elapsed = Math.floor((new Date() - breakStartTime) / 1000);
-    const mins = Math.floor(elapsed / 60);
-    const secs = elapsed % 60;
-    
-    if (mins >= 25) {
-        endBreak();
-        return;
-    }
-    
-    timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-function resetBreakControls() {
-    clearInterval(breakInterval);
-    timerDisplay.textContent = '00:00';
-    breakActive = false;
-    breakStartTime = null;
-    selectedBreakMinutes = 0;
-    breakButtons.forEach(btn => btn.classList.remove('active'));
-    startBreakBtn.disabled = false;
-    endBreakBtn.disabled = true;
-}
-
-function updateBreakType() {
-    const hours = new Date().getHours();
-    breakTypeInput.value = 
-        hours >= 8 && hours < 12 ? 'Desayuno' :
-        hours >= 12 && hours < 16 ? 'Almuerzo' :
-        hours >= 16 && hours < 20 ? 'Merienda' : 'Fuera de horario';
-}
-
-// Funciones de filtrado que no cambian
-function filterEntryExitTable() {
-    const searchTerm = entryExitSearch.value.toLowerCase();
-    entryExitTableBody.querySelectorAll('tr').forEach(row => {
-        row.style.display = row.cells[0].textContent.includes(searchTerm) ? '' : 'none';
-    });
-}
-
-function filterBreakTable() {
-    const searchTerm = breakSearch.value.toLowerCase();
-    breakTableBody.querySelectorAll('tr').forEach(row => {
-        row.style.display = row.cells[0].textContent.includes(searchTerm) ? '' : 'none';
-    });
-}
-
-// Funciones de Simulador de Precios que no cambian
+// Calcular precio
 function calculatePrice() {
     const medicineName = medicineNameInput.value.trim();
     const grossPrice = parseFloat(grossPriceInput.value);
@@ -514,6 +487,7 @@ function calculatePrice() {
     updateGrandTotal();
 }
 
+// Actualizar total general
 function updateGrandTotal() {
     const prices = Array.from(priceTableBody.querySelectorAll('tr td:nth-child(4)'))
         .map(td => {
@@ -525,6 +499,7 @@ function updateGrandTotal() {
     document.getElementById('grand-total').textContent = formatCurrency(total);
 }
 
+// Limpiar tabla de precios
 function clearPriceTable() {
     if (priceTableBody.children.length === 0) {
         showMessage('La tabla está vacía');
@@ -540,11 +515,36 @@ function clearPriceTable() {
     showDeleteConfirmation();
 }
 
-// Funciones para modales que no cambian
+// ==============================================
+// FUNCIONES DE FILTRADO
+// ==============================================
+
+// Filtrar tabla de entradas/salidas
+function filterEntryExitTable() {
+    const searchTerm = entryExitSearch.value.toLowerCase();
+    entryExitTableBody.querySelectorAll('tr').forEach(row => {
+        row.style.display = row.cells[0].textContent.includes(searchTerm) ? '' : 'none';
+    });
+}
+
+// Filtrar tabla de descansos
+function filterBreakTable() {
+    const searchTerm = breakSearch.value.toLowerCase();
+    breakTableBody.querySelectorAll('tr').forEach(row => {
+        row.style.display = row.cells[0].textContent.includes(searchTerm) ? '' : 'none';
+    });
+}
+
+// ==============================================
+// FUNCIONES DE MODALES
+// ==============================================
+
+// Mostrar confirmación de eliminación
 function showDeleteConfirmation() {
     confirmModal.classList.remove('hidden');
 }
 
+// Confirmar eliminación
 function confirmDelete() {
     if (currentDeleteFunction) {
         currentDeleteFunction();
@@ -552,13 +552,29 @@ function confirmDelete() {
     confirmModal.classList.add('hidden');
 }
 
+// Cancelar eliminación
 function cancelDelete() {
     confirmModal.classList.add('hidden');
     currentRecordToDelete = null;
     currentDeleteFunction = null;
 }
 
-// Funciones de utilidad que no cambian
+// Mostrar mensaje
+function showMessage(msg) {
+    modalMessage.textContent = msg;
+    modal.classList.remove('hidden');
+}
+
+// Cerrar modal de mensaje
+function closeMessageModal() {
+    modal.classList.add('hidden');
+}
+
+// ==============================================
+// FUNCIONES DE UTILIDAD
+// ==============================================
+
+// Copiar tabla al portapapeles
 function copyTableToClipboard(tableId) {
     try {
         const table = document.getElementById(tableId);
@@ -614,23 +630,63 @@ function copyTableToClipboard(tableId) {
     }
 }
 
+// Formatear fecha
 function formatDate(date) {
     return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+// Formatear hora
 function formatTime(date) {
     return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Formatear moneda
 function formatCurrency(amount) {
     return '$' + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-function showMessage(msg) {
-    modalMessage.textContent = msg;
-    modal.classList.remove('hidden');
-}
+// ==============================================
+// INICIALIZACIÓN
+// ==============================================
 
-function closeMessageModal() {
-    modal.classList.add('hidden');
-}
+document.addEventListener('DOMContentLoaded', () => {
+    loginForm.addEventListener('submit', handleLogin);
+    logoutBtn.addEventListener('click', handleLogout);
+    
+    entryExitOption.addEventListener('click', () => showSection('entry-exit'));
+    breakOption.addEventListener('click', () => showSection('break'));
+    priceOption.addEventListener('click', () => showSection('price'));
+    
+    registerEntryBtn.addEventListener('click', registerEntry);
+    registerExitBtn.addEventListener('click', registerExit);
+    entryExitSearch.addEventListener('input', filterEntryExitTable);
+    copyEntryExitBtn.addEventListener('click', () => {
+        if (!currentUser.isAdmin) {
+            showMessage('Acceso restringido: Solo administradores');
+            return;
+        }
+        copyTableToClipboard('entry-exit-table');
+    });
+    
+    startBreakBtn.addEventListener('click', startBreak);
+    endBreakBtn.addEventListener('click', endBreak);
+    breakButtons.forEach(btn => btn.addEventListener('click', selectBreakDuration));
+    breakSearch.addEventListener('input', filterBreakTable);
+    copyBreakBtn.addEventListener('click', () => {
+        if (!currentUser.isAdmin) {
+            showMessage('Acceso restringido: Solo administradores');
+            return;
+        }
+        copyTableToClipboard('break-table');
+    });
+    
+    calculatePriceBtn.addEventListener('click', calculatePrice);
+    clearPriceTableBtn.addEventListener('click', clearPriceTable);
+    
+    // Eventos para modales
+    closeModal.addEventListener('click', closeMessageModal);
+    modal.addEventListener('click', (e) => e.target === modal && closeMessageModal());
+    confirmYes.addEventListener('click', confirmDelete);
+    confirmNo.addEventListener('click', cancelDelete);
+    confirmModal.addEventListener('click', (e) => e.target === confirmModal && cancelDelete());
+});
