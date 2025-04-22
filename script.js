@@ -1,7 +1,11 @@
 // ==============================================
-// CONFIGURACIÓN BASE - URLs y opciones de fetch
+// CONFIGURACIÓN BASE - URLs dinámicas
 // ==============================================
-const API_BASE_URL = 'https://knoza.onrender.com/api';
+const IS_DEVELOPMENT = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = IS_DEVELOPMENT 
+  ? 'http://localhost:3001/api' 
+  : 'https://knoza.onrender.com/api';
+
 const FETCH_OPTIONS = {
   credentials: 'include',
   headers: {
